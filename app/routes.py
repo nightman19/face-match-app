@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, current_app, flash
-import os
+import os, uuid
+from datetime import datetime
 from werkzeug.utils import secure_filename
 from .utils import compare_faces
 from app.models import Verification
@@ -40,30 +41,21 @@ def index():
         # Absolute path to save files
         upload_folder = os.path.join(current_app.root_path, 'static', 'uploads')
         os.makedirs(upload_folder, exist_ok=True)
+        
+        unique_id = uuid.uuid4().hex[:8]   # e.g., 'a3f9b2d1'
 
-        abs_id_path = os.path.join(upload_folder, f"id{id_ext}")
-        abs_selfie_path = os.path.join(upload_folder, f"selfie{selfie_ext}")
+        abs_id_path = os.path.join(upload_folder, f"id_{unique_id}{id_ext}")
+        abs_selfie_path = os.path.join(upload_folder, f"selfie_{unique_id}{selfie_ext}")
 
         id_file.save(abs_id_path)
         selfie_file.save(abs_selfie_path)
 
-        # Relative paths for browser rendering
-        rel_id_path = f"uploads/id{id_ext}"
-        rel_selfie_path = f"uploads/selfie{selfie_ext}"
+       # Relative paths (to /static/)
+        rel_id_path = os.path.relpath(abs_id_path, os.path.join(current_app.root_path, 'static'))
+        rel_selfie_path = os.path.relpath(abs_selfie_path, os.path.join(current_app.root_path, 'static'))
 
         # Perform face match
         result_data = compare_faces(abs_id_path, abs_selfie_path)
-        session['result'] = result_data['message']
-
-        # # Save to DB
-        # new_verification = Verification(
-        #     id_path=rel_id_path,
-        #     selfie_path=rel_selfie_path,
-        #     match_result=result_data['match'],
-        #     distance=result_data['distance']
-        # )
-        # db.session.add(new_verification)
-        # db.session.commit()
 
         # Store result and paths in session for display
         session['result'] = "✅ Match" if result_data['match'] else "❌ No Match"
@@ -97,10 +89,35 @@ def clear_result():
     session.pop('result', None)
     return redirect(url_for('main.index'))
 
-@main.route('/dashboard')
+@main.route('/dashboard', methods=['GET'])
 def dashboard():
-    from .models import Verification
-    verifications = Verification.query.order_by(Verification.timestamp.desc()).all()
+    
+    query  = Verification.query
+
+    match_filter = request.args.get('match')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    if match_filter == '1':
+        query = query.filter_by(match_result=True)
+    elif match_filter == '0':
+        query = query.filter_by(match_result=False)
+
+    if start_date:
+        try:
+            start = datetime.strptime(start_date, '%m/%d/%Y')
+            query = query.filter(Verification.timestamp >= start)
+        except ValueError:
+            pass
+    
+    if end_date:
+        try:
+            end = datetime.strptime(end_date, '%m/%d/%Y')
+            query = query.filter(Verification.timestamp <= end)
+        except ValueError:
+            pass
+
+    verifications = query.order_by(Verification.timestamp.desc()).all()
     return render_template('dashboard.html', verifications=verifications)
 
 @main.route('/delete/<int:verification_id>', methods=['GET'])
