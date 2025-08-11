@@ -116,9 +116,13 @@ def dashboard():
             query = query.filter(Verification.timestamp <= end)
         except ValueError:
             pass
-
-    verifications = query.order_by(Verification.timestamp.desc()).all()
-    return render_template('dashboard.html', verifications=verifications)
+    
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    paginated = query.order_by(Verification.timestamp.desc()).paginate(page=page, per_page=per_page)
+    
+    return render_template('dashboard.html', verifications=paginated.items, pagination=paginated)
 
 @main.route('/delete/<int:verification_id>', methods=['GET'])
 def delete_verification(verification_id):
