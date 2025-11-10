@@ -112,8 +112,3 @@ This project is licensed under the **MIT License** — you’re free to use, mod
 -----
 
 > ⚡ *“Not every web app needs Django. Sometimes, Flask + clean architecture does the job beautifully.”*
-
-```
-
-Now that your project's documentation is finalized, would you like to start working on a specific file, such as `app.py`, `models.py`, or `routes.py`, to implement the core logic?
-```
